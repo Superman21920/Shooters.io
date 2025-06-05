@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diep.io RPG Multiplayer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #0f0f23, #1a1a3a);
+            color: white;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: #1a1a3a;
+        }
+
+        #gameCanvas {
+            background: linear-gradient(45deg, #2a2a4a 25%, transparent 25%),
+                        linear-gradient(-45deg, #2a2a4a 25%, transparent 25%),
+                        linear-gradient(45deg, transparent 75%, #2a2a4a 75%),
+                        linear-gradient(-45deg, transparent 75%, #2a2a4a 75%);
+            background-size: 40px 40px;
+            background-position: 0 0, 0 20px, 20px -20px, -20px 0px;
+            display: block;
+            cursor: crosshair;
+        }
+
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #00ff88;
+            min-width: 200px;
+            backdrop-filter: blur(5px);
+        }
+
+        #playerStats {
+            margin-bottom: 10px;
+        }
+
+        #playerName {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00ff88;
+            margin-bottom: 5px;
+        }
+
+        #healthBar, #expBar {
+            width: 180px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            margin: 5px 0;
+            overflow: hidden;
+        }
+
+        #healthFill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff4444, #ff8844);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        #expFill {
+            height: 100%;
+            background: linear-gradient(90deg, #4488ff, #88aaff);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        #leaderboard {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #ffaa00;
+            min-width: 200px;
+            backdrop-filter: blur(5px);
+        }
+
+        #leaderboard h3 {
+            color: #ffaa00;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .leaderboard-entry {
+            padding: 3px 0;
+            font-size: 12px;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 10px;
+            border: 2px solid #88aaff;
+            backdrop-filter: blur(5px);
+            font-size: 12px;
+        }
+
+        #nameInput {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 10px;
+            border: 2px solid #ff8844;
+            backdrop-filter: blur(5px);
+            pointer-events: all;
+        }
+
+        #nameInput input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid #ff8844;
+            color: white;
+            padding: 5px;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+
+        #nameInput button {
+            background: #ff8844;
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 5px;
+        }
+
+        #nameInput button:hover {
+            background: #ffaa66;
+        }
+
+        #connectionStatus {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #ff4444;
+            text-align: center;
+            z-index: 100;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #minimap {
+            position: absolute;
+            bottom: 20px;
+            right: 200px;
+            width: 150px;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #00ff88;
+            border-radius: 10px;
+            backdrop-filter: blur(5px);
+        }
+
+        @keyframes levelUp {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        .level-up {
+            animation: levelUp 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="ui">
+            <div id="hud">
+                <div id="playerStats">
+                    <div id="playerName">Tank Player</div>
+                    <div>Level: <span id="level">1</span></div>
+                    <div>Score: <span id="score">0</span></div>
+                    <div>Health:</div>
+                    <div id="healthBar">
+                        <div id="healthFill" style="width: 100%"></div>
+                    </div>
+                    <div>Experience:</div>
+                    <div id="expBar">
+                        <div id="expFill" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="leaderboard">
+                <h3>🏆 Leaderboard</h3>
+                <div id="leaderboardList"></div>
+            </div>
+
+            <div id="controls">
+                <strong>Controls:</strong><br>
+                WASD - Move<br>
+                Mouse - Aim<br>
+                Click - Shoot<br>
+                Enter - Chat
+            </div>
+
+            <div id="nameInput">
+                <input type="text" id="playerNameInput" placeholder="Enter name" maxlength="20">
+                <button onclick="changeName()">Change Name</button>
+            </div>
+
+            <canvas id="minimap"></canvas>
+
+            <div id="connectionStatus" class="hidden">
+                <h3>Connecting to server...</h3>
+                <p>Please wait while we establish connection</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Game variables
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const minimap = document.getElementById('minimap');
+        const minimapCtx = minimap.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        minimap.width = 150;
+        minimap.height = 150;
+
+        let socket;
+        let myPlayer = null;
+        let players = {};
+        let bullets = {};
+        let food = {};
+        let gameConfig = {};
+        let camera = { x: 0, y: 0 };
+        let keys = {};
+        let mousePos = { x: 0, y: 0 };
+        let lastUpdate = Date.now();
+
+        // Initialize connection
+        function initConnection() {
+            document.getElementById('connectionStatus').classList.remove('hidden');
+            
+            socket = io();
+            
+            socket.on('connect', () => {
+                console.log('Connected to server');
+                document.getElementById('connectionStatus').classList.add('hidden');
+            });
+
+            socket.on('disconnect', () => {
+                console.log('Disconnected from server');
+                document.getElementById('connectionStatus').classList.remove('hidden');
+                document.getElementById('connectionStatus').innerHTML = '<h3>Connection Lost</h3><p>Attempting to reconnect...</p>';
+            });
+
+            socket.on('init', (data) => {
+                myPlayer = data.player;
+                players = {};
+                data.players.forEach(p => players[p.id] = p);
+                food = {};
+                data.food.forEach(f => food[f.id] = f);
+                gameConfig = data.gameConfig;
+                updateUI();
+            });
+
+            socket.on('playerJoined', (player) => {
+                players[player.id] = player;
+            });
+
+            socket.on('playerLeft', (playerId) => {
+                delete players[playerId];
+            });
+
+            socket.on('playerMoved', (data) => {
+                if (players[data.id]) {
+                    players[data.id].x = data.x;
+                    players[data.id].y = data.y;
+                    players[data.id].angle = data.angle;
+                }
+            });
+
+            socket.on('bulletFired', (bullet) => {
+                bullets[bullet.id] = bullet;
+            });
+
+            socket.on('bulletDestroyed', (bulletId) => {
+                delete bullets[bulletId];
+            });
+
+            socket.on('foodSpawned', (foodItem) => {
+                food[foodItem.id] = foodItem;
+            });
+
+            socket.on('foodDestroyed', (foodId) => {
+                delete food[foodId];
+            });
+
+            socket.on('playerHit', (data) => {
+                if (players[data.playerId]) {
+                    players[data.playerId].health = data.health;
+                    if (data.playerId === myPlayer.id) {
+                        myPlayer.health = data.health;
+                        updateUI();
+                    }
+                }
+            });
+
+            socket.on('playerDied', (data) => {
+                if (data.playerId === myPlayer.id) {
+                    myPlayer.x = data.newPos.x;
+                    myPlayer.y = data.newPos.y;
+                    updateUI();
+                }
+                if (players[data.playerId]) {
+                    players[data.playerId].x = data.newPos.x;
+                    players[data.playerId].y = data.newPos.y;
+                }
+            });
+
+            socket.on('levelUp', (data) => {
+                if (data.playerId === myPlayer.id) {
+                    document.getElementById('hud').classList.add('level-up');
+                    setTimeout(() => {
+                        document.getElementById('hud').classList.remove('level-up');
+                    }, 500);
+                }
+            });
+
+            socket.on('gameUpdate', (data) => {
+                data.players.forEach(p => {
+                    if (players[p.id]) {
+                        Object.assign(players[p.id], p);
+                    }
+                    if (p.id === myPlayer.id) {
+                        Object.assign(myPlayer, p);
+                        updateUI();
+                    }
+                });
+                
+                bullets = {};
+                data.bullets.forEach(b => bullets[b.id] = b);
+            });
+        }
+
+        // Input handling
+        document.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.key === 'Enter') {
+                document.getElementById('playerNameInput').focus();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mousePos.x = e.clientX - rect.left;
+            mousePos.y = e.clientY - rect.top;
+        });
+
+        canvas.addEventListener('click', () => {
+            if (socket && myPlayer) {
+                socket.emit('shoot', {});
+            }
+        });
+
+        function changeName() {
+            const nameInput = document.getElementById('playerNameInput');
+            const newName = nameInput.value.trim();
+            if (newName && socket) {
+                socket.emit('changeName', newName);
+                nameInput.value = '';
+            }
+        }
+
+        // Game loop
+        function gameLoop() {
+            if (!myPlayer) {
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+
+            const now = Date.now();
+            const deltaTime = now - lastUpdate;
+            lastUpdate = now;
+
+            // Handle movement
+            let dx = 0, dy = 0;
+            if (keys['w'] || keys['arrowup']) dy -= 1;
+            if (keys['s'] || keys['arrowdown']) dy += 1;
+            if (keys['a'] || keys['arrowleft']) dx -= 1;
+            if (keys['d'] || keys['arrowright']) dx += 1;
+
+            if (dx !== 0 || dy !== 0) {
+                const length = Math.sqrt(dx * dx + dy * dy);
+                dx /= length;
+                dy /= length;
+
+                myPlayer.x += dx * myPlayer.speed;
+                myPlayer.y += dy * myPlayer.speed;
+
+                // Calculate angle to mouse
+                const worldMouseX = mousePos.x + camera.x;
+                const worldMouseY = mousePos.y + camera.y;
+                myPlayer.angle = Math.atan2(worldMouseY - myPlayer.y, worldMouseX - myPlayer.x);
+
+                socket.emit('move', {
+                    x: myPlayer.x,
+                    y: myPlayer.y,
+                    angle: myPlayer.angle
+                });
+            }
+
+            // Update camera
+            camera.x = myPlayer.x - canvas.width / 2;
+            camera.y = myPlayer.y - canvas.height / 2;
+
+            render();
+            updateLeaderboard();
+            updateMinimap();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function render() {
+            // Clear canvas
+            ctx.fillStyle = '#1a1a3a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw grid
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+            
+            const gridSize = 50;
+            const startX = Math.floor(camera.x / gridSize) * gridSize - camera.x;
+            const startY = Math.floor(camera.y / gridSize) * gridSize - camera.y;
+            
+            for (let x = startX; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            
+            for (let y = startY; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // Draw food
+            for (const f of Object.values(food)) {
+                const x = f.x - camera.x;
+                const y = f.y - camera.y;
+                
+                if (x > -50 && x < canvas.width + 50 && y > -50 && y < canvas.height + 50) {
+                    ctx.fillStyle = f.color;
+                    ctx.beginPath();
+                    
+                    // Draw different shapes based on food type
+                    if (f.color === '#FFD700') {
+                        // Circle
+                        ctx.arc(x, y, f.size, 0, Math.PI * 2);
+                    } else if (f.color === '#FF6347') {
+                        // Square
+                        ctx.rect(x - f.size, y - f.size, f.size * 2, f.size * 2);
+                    } else if (f.color === '#32CD32') {
+                        // Triangle
+                        ctx.moveTo(x, y - f.size);
+                        ctx.lineTo(x - f.size, y + f.size);
+                        ctx.lineTo(x + f.size, y + f.size);
+                        ctx.closePath();
+                    } else {
+                        // Pentagon
+                        const sides = 5;
+                        ctx.moveTo(x + f.size * Math.cos(0), y + f.size * Math.sin(0));
+                        for (let i = 1; i <= sides; i++) {
+                            const angle = (i * 2 * Math.PI) / sides;
+                            ctx.lineTo(x + f.size * Math.cos(angle), y + f.size * Math.sin(angle));
+                        }
+                        ctx.closePath();
+                    }
+                    
+                    ctx.fill();
+                    
+                    // Add glow effect
+                    ctx.shadowColor = f.color;
+                    ctx.shadowBlur = 10;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+            }
+
+            // Draw bullets
+            for (const bullet of Object.values(bullets)) {
+                const x = bullet.x - camera.x;
+                const y = bullet.y - camera.y;
+                
+                if (x > -10 && x < canvas.width + 10 && y > -10 && y < canvas.height + 10) {
+                    ctx.fillStyle = '#ffff00';
+                    ctx.beginPath();
+                    ctx.arc(x, y, bullet.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Add glow
+                    ctx.shadowColor = '#ffff00';
+                    ctx.shadowBlur = 8;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+            }
+
+            // Draw players
+            for (const player of Object.values(players)) {
+                const x = player.x - camera.x;
+                const y = player.y - camera.y;
+                
+                if (x > -100 && x < canvas.width + 100 && y > -100 && y < canvas.height + 100) {
+                    drawTank(x, y, player.angle, player.size, player.color, player.id === myPlayer.id);
+                    
+                    // Draw name and health bar
+                    ctx.fillStyle = 'white';
+                    ctx.font = '14px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(player.name, x, y - player.size - 20);
+                    
+                    // Health bar
+                    const barWidth = player.size * 1.5;
+                    const barHeight = 4;
+                    const healthPercent = player.health / player.maxHealth;
+                    
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctx.fillRect(x - barWidth/2, y - player.size - 10, barWidth, barHeight);
+                    
+                    ctx.fillStyle = healthPercent > 0.5 ? '#00ff00' : healthPercent > 0.25 ? '#ffff00' : '#ff0000';
+                    ctx.fillRect(x - barWidth/2, y - player.size - 10, barWidth * healthPercent, barHeight);
+                    
+                    // Level indicator
+                    ctx.fillStyle = '#00aaff';
+                    ctx.font = '12px Arial';
+                    ctx.fillText(`Lv.${player.level}`, x, y + player.size + 15);
+                }
+            }
+        }
+
+        function drawTank(x, y, angle, size, color, isMe) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            
+            // Tank body
+            ctx.fillStyle = color;
+            ctx.strokeStyle = isMe ? '#00ff88' : '#333';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(0, 0, size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Tank cannon
+            ctx.fillStyle = color;
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.fillRect(size/2, -size/6, size, size/3);
+            ctx.strokeRect(size/2, -size/6, size, size/3);
+            
+            // Tank details
+            ctx.fillStyle = isMe ? '#00ff88' : '#555';
+            ctx.beginPath();
+            ctx.arc(0, 0, size * 0.7, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
+
+        function updateUI() {
+            if (!myPlayer) return;
+            
+            document.getElementById('playerName').textContent = myPlayer.name;
+            document.getElementById('level').textContent = myPlayer.level;
+            document.getElementById('score').textContent = myPlayer.score.toLocaleString();
+            
+            const healthPercent = (myPlayer.health / myPlayer.maxHealth) * 100;
+            document.getElementById('healthFill').style.width = healthPercent + '%';
+            
+            const expForCurrentLevel = (myPlayer.level - 1) * (myPlayer.level - 1) * 100;
+            const expForNextLevel = myPlayer.level * myPlayer.level * 100;
+            const expProgress = ((myPlayer.exp - expForCurrentLevel) / (expForNextLevel - expForCurrentLevel)) * 100;
+            document.getElementById('expFill').style.width = Math.max(0, Math.min(100, expProgress)) + '%';
+        }
+
+        function updateLeaderboard() {
+            const sortedPlayers = Object.values(players).sort((a, b) => b.score - a.score).slice(0, 10);
+            const leaderboardHTML = sortedPlayers.map((player, index) => {
+                const isMe = player.id === myPlayer.id;
+                return `<div class="leaderboard-entry" style="color: ${isMe ? '#00ff88' : 'white'}">
+                    ${index + 1}. ${player.name} - ${player.score.toLocaleString()}
+                </div>`;
+            }).join('');
+            
+            document.getElementById('leaderboardList').innerHTML = leaderboardHTML;
+        }
+
+        function updateMinimap() {
+            if (!gameConfig.worldWidth) return;
+            
+            minimapCtx.fillStyle = '#1a1a3a';
+            minimapCtx.fillRect(0, 0, 150, 150);
+            
+            const scaleX = 150 / gameConfig.worldWidth;
+            const scaleY = 150 / gameConfig.worldHeight;
+            
+            // Draw players on minimap
+            for (const player of Object.values(players)) {
+                const x = player.x * scaleX;
+                const y = player.y * scaleY;
+                
+                minimapCtx.fillStyle = player.id === myPlayer.id ? '#00ff88' : player.color;
+                minimapCtx.beginPath();
+                minimapCtx.arc(x, y, 2, 0, Math.PI * 2);
+                minimapCtx.fill();
+            }
+            
+            // Draw border
+            minimapCtx.strokeStyle = '#00ff88';
+            minimapCtx.lineWidth = 2;
+            minimapCtx.strokeRect(0, 0, 150, 150);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        // Start the game
+        initConnection();
+        gameLoop();
+    </script>
+</body>
+</html>

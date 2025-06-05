@@ -1,0 +1,32 @@
+{
+  "name": "diep-io-rpg-multiplayer",
+  "version": "1.0.0",
+  "description": "A multiplayer tank battle game inspired by Diep.io with RPG elements",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "keywords": [
+    "game",
+    "multiplayer",
+    "diep.io",
+    "rpg",
+    "tank",
+    "io-game",
+    "websocket",
+    "nodejs"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
